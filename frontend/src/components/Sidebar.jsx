@@ -11,7 +11,7 @@ const navItems = [
     { path: '/groups', icon: '👥', label: 'Study Groups' },
     { path: '/friends', icon: '👥', label: 'Friends' },
     { path: '/chat', icon: '💬', label: 'Chat' },
-    { path: '/game', icon: '🎮', label: 'Boss Battle' },
+    { path: '/quest', icon: '🗺️', label: 'Side Quest' },
     { path: '/assistant', icon: '🤖', label: 'AI Assistant' },
     { path: '/weekly-report', icon: '📋', label: 'Weekly Report' },
     { path: '/pomodoro', icon: '⏱️', label: 'Pomodoro Timer' },
@@ -63,9 +63,11 @@ export default function Sidebar() {
                     <Link
                         key={item.path}
                         to={item.path}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${location.pathname === item.path
-                            ? 'bg-indigo-500 text-white font-medium'
-                            : 'text-indigo-300 hover:bg-white/10 hover:text-white'
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
+                            // highlight /quest and /game under the same nav item
+                            (location.pathname === item.path || (item.path === '/quest' && location.pathname === '/game'))
+                                ? 'bg-indigo-500 text-white font-medium'
+                                : 'text-indigo-300 hover:bg-white/10 hover:text-white'
                             }`}
                     >
                         <span>{item.icon}</span>
