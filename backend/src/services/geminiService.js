@@ -76,4 +76,36 @@ Return ONLY a JSON object in this exact format:
     return JSON.parse(clean);
 };
 
-module.exports = { generateStudyPlan, generateWeeklyReport };
+const chatWithAssistant = async (messages, userSubjects = []) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
+
+    const systemContext = `You are StudyMate AI, a helpful study assistant for students.
+You can:
+- Explain concepts clearly and simply
+- Summarise notes or topics
+- Generate practice quiz questions
+- Give study tips and techniques
+- Help with any academic subject
+
+The student is currently studying: ${userSubjects.length > 0 ? userSubjects.join(', ') : 'various subjects'}.
+Keep responses concise, friendly, and educational. Use bullet points and structure where helpful.`;
+
+    const history = messages.slice(0, -1).map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }]
+    }));
+
+    const chat = model.startChat({
+        history: [
+            { role: 'user', parts: [{ text: systemContext }] },
+            { role: 'model', parts: [{ text: "Understood! I'm ready to help you study." }] },
+            ...history
+        ]
+    });
+
+    const lastMessage = messages[messages.length - 1].content;
+    const result = await chat.sendMessage(lastMessage);
+    return result.response.text();
+};
+
+module.exports = { generateStudyPlan, generateWeeklyReport, chatWithAssistant };

@@ -6,6 +6,10 @@ import Dashboard from './pages/Dashboard'
 import Assignments from './pages/Assignments'
 import HabitTracker from './pages/HabitTracker'
 import StudyPlanner from './pages/StudyPlanner'
+import Progress from './pages/Progress'
+import WeeklyReport from './pages/WeeklyReport'
+import Pomodoro from './pages/Pomodoro'
+import AIAssistant from './pages/AIAssistant'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -24,6 +28,10 @@ function App() {
       <Route path="/assignments" element={<ProtectedRoute><Assignments /></ProtectedRoute>} />
       <Route path="/habits" element={<ProtectedRoute><HabitTracker /></ProtectedRoute>} />
       <Route path="/planner" element={<ProtectedRoute><StudyPlanner /></ProtectedRoute>} />
+      <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
+      <Route path="/pomodoro" element={<ProtectedRoute><Pomodoro /></ProtectedRoute>} />
+      <Route path="/weekly-report" element={<ProtectedRoute><WeeklyReport /></ProtectedRoute>} />
+      <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   )
