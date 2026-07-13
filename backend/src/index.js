@@ -11,6 +11,8 @@ const habitRoutes = require('./routes/habits');
 const studyPlanRoutes = require('./routes/studyPlan');
 const progressRoutes = require('./routes/progress_route');   // with other require
 const assistantRoutes = require('./routes/assistant_route');
+const battleRoutes = require('./routes/battle');
+const noteRoutes = require('./routes/notes');
 const app = express();
 
 app.use(cors());
@@ -22,7 +24,8 @@ app.use('/api/habits', habitRoutes);
 app.use('/api/study-plan', studyPlanRoutes);
 app.use('/api/progress', progressRoutes)
 app.use('/api/assistant', assistantRoutes);
-
+app.use('/api/battle', battleRoutes);
+app.use('/api/notes', noteRoutes);
 app.get('/', (req, res) => {
     res.json({ message: 'StudyMate API is running!' });
 });

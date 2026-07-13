@@ -10,6 +10,8 @@ import Progress from './pages/Progress'
 import WeeklyReport from './pages/WeeklyReport'
 import Pomodoro from './pages/Pomodoro'
 import AIAssistant from './pages/AIAssistant'
+import BossBattle from './pages/BossBattle'
+import NotesMarketplace from './pages/NotesMarketplace'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -32,6 +34,8 @@ function App() {
       <Route path="/pomodoro" element={<ProtectedRoute><Pomodoro /></ProtectedRoute>} />
       <Route path="/weekly-report" element={<ProtectedRoute><WeeklyReport /></ProtectedRoute>} />
       <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+      <Route path="/game" element={<ProtectedRoute><BossBattle /></ProtectedRoute>} />
+      <Route path="/notes" element={<ProtectedRoute><NotesMarketplace /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   )
