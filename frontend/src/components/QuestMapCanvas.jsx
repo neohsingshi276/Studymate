@@ -1,12 +1,13 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import QuestMapScene from '../game/QuestMapScene';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { START_POS, isValidSavedPosition, CHECKPOINTS } from '../game/questConfig';
 
 const SAVE_INTERVAL = 5000;
-const BOOT_API_TIMEOUT = 2500;
+// Increased timeout — slow connections should still get their saved position.
+const BOOT_API_TIMEOUT = 5000;
 
 const withTimeout = (promise, fallback, label) => {
     let timeoutId;
@@ -16,13 +17,13 @@ const withTimeout = (promise, fallback, label) => {
             resolve(fallback);
         }, BOOT_API_TIMEOUT);
     });
-
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 };
 
 const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const containerRef = useRef(null);
     const gameRef = useRef(null);
@@ -33,8 +34,6 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
     const [loadPct, setLoadPct] = useState(0);
     const [error, setError] = useState('');
 
-    // Progress is kept in a ref so the Phaser scene can read the latest
-    // value every frame without forcing Phaser to restart on re-render.
     const progressRef = useRef([]);
 
     const fetchProgress = useCallback(async () => {
@@ -53,32 +52,27 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
 
     const getProgress = useCallback(() => progressRef.current, []);
 
-    // CP1 is always unlocked. CP2 requires CP1 completed. CP3 requires CP2 completed.
-    // (Checkpoints 2 & 3 don't have a game built yet, so entering them is a no-op
-    // in handleCheckpointReached below — but the lock state itself still follows
-    // your original sequential-unlock design.)
     const getIsCheckpointUnlocked = useCallback((cpId) => {
         if (cpId === 1) return true;
         const prev = progressRef.current.find(p => p.checkpoint_number === cpId - 1);
         return !!prev?.completed;
     }, []);
 
-    // Fired whenever the player enters/leaves a checkpoint's radius.
-    // Not wired to anything yet — hook this up if you want a UI panel,
-    // sound cue, etc. when the player gets near a checkpoint.
-    const onNearCheckpoint = useCallback(() => {
-        // no-op for now
-    }, []);
+    const onNearCheckpoint = useCallback(() => { }, []);
 
-    // Called when the player presses E on an unlocked, unfinished checkpoint
     const handleCheckpointReached = useCallback((cpId, route) => {
         const scene = sceneRef.current;
         if (scene) {
-            const { x, y } = scene.getPlayerPosition();
-            api.post('/quest/position', { pos_x: x, pos_y: y }).catch(() => { });
+            // Save the exact checkpoint position so the player reliably
+            // returns here (not to START_POS) after completing the game.
+            const cpDef = CHECKPOINTS.find(c => c.id === cpId);
+            const saveX = cpDef?.x ?? scene.getPlayerPosition().x;
+            const saveY = cpDef?.y ?? scene.getPlayerPosition().y;
+            api.post('/quest/position', { pos_x: saveX, pos_y: saveY }).catch(() => { });
         }
         if (route) {
-            navigate(route);
+            // Pass which checkpoint was entered so we can spawn there on return.
+            navigate(route, { state: { returnToCp: cpId } });
         } else {
             console.log(`Checkpoint ${cpId} reached, but no game is built for it yet.`);
         }
@@ -99,14 +93,20 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
         lastSave.current = Date.now();
 
         const boot = async () => {
+            // Fetch progress first (before Phaser starts) so CP markers are
+            // correct from the very first frame.
             await withTimeout(fetchProgress(), progressRef.current, 'progress request');
 
             let initialPos = { ...START_POS };
+
+            // Try to restore the saved position from the API.
+            let positionFromApi = false;
             await withTimeout((async () => {
                 const res = await api.get('/quest/position');
                 const pos = res.data?.position;
                 if (pos && isValidSavedPosition(pos.pos_x, pos.pos_y)) {
                     initialPos = { x: pos.pos_x, y: pos.pos_y };
+                    positionFromApi = true;
                 }
                 return initialPos;
             })().catch(err => {
@@ -114,12 +114,23 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
                 return initialPos;
             }), initialPos, 'position request');
 
+            // Fallback: if the API didn't supply a position AND we know which
+            // checkpoint the player just completed, spawn them near that CP.
+            if (!positionFromApi) {
+                const returnToCp = location.state?.returnToCp;
+                if (returnToCp) {
+                    const cpDef = CHECKPOINTS.find(c => c.id === returnToCp);
+                    if (cpDef) {
+                        initialPos = { x: cpDef.x, y: cpDef.y };
+                        console.log(`QuestMapCanvas: spawning near CP${returnToCp} from navigate state`);
+                    }
+                }
+            }
+
             if (cancelled) return;
 
             try {
                 const { default: Phaser } = await import('phaser');
-                // Re-check after the await — StrictMode can cancel this exact
-                // in-flight boot() call before we get here.
                 if (cancelled || !containerRef.current || gameRef.current) return;
 
                 const viewW = window.innerWidth;
@@ -141,9 +152,6 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
                     scene: [],
                 });
 
-                // If cleanup already fired by the time the game finished
-                // constructing (StrictMode's phantom mount), tear it straight
-                // back down instead of leaving it dangling.
                 if (cancelled) {
                     game.destroy(true);
                     return;
@@ -166,15 +174,10 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
                     onLoadError: (message) => setError(message),
                 };
 
-                // Add the scene immediately rather than waiting on a 'ready' event
-                // (see fix note in commit history — that event doesn't reliably
-                // fire in this Phaser version).
                 game.scene.add('QuestMapScene', QuestMapScene, true, sceneData);
                 sceneRef.current = game.scene.getScene('QuestMapScene');
 
-                const onResize = () => {
-                    game.scale.resize(window.innerWidth, window.innerHeight);
-                };
+                const onResize = () => game.scale.resize(window.innerWidth, window.innerHeight);
                 window.addEventListener('resize', onResize);
                 window.addEventListener('beforeunload', savePosition);
 
@@ -196,8 +199,6 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
 
         return () => {
             cancelled = true;
-            // Tear down whatever got created before this cleanup ran — handles
-            // both StrictMode's phantom mount and a genuine unmount.
             const game = gameRef.current;
             if (game) {
                 savePosition();
@@ -212,8 +213,7 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Refresh progress whenever the user comes back to this page (e.g. after
-    // finishing a checkpoint game and navigating back)
+    // Re-fetch progress whenever the player comes back (e.g. after finishing a game).
     useEffect(() => {
         fetchProgress();
     }, [fetchProgress]);
@@ -237,26 +237,19 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
                     position: 'absolute', inset: 0,
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
-                    background: '#1a1a2e',
-                    zIndex: 10,
-                    gap: 16,
+                    background: '#1a1a2e', zIndex: 10, gap: 16,
                 }}>
                     <div style={{ color: '#FFD700', fontWeight: 'bold', fontSize: 18 }}>
                         Loading Quest Map...
                     </div>
                     <div style={{
-                        width: 220, height: 10,
-                        background: '#0f1a2e',
-                        borderRadius: 5,
-                        overflow: 'hidden',
-                        border: '1px solid #2563eb',
+                        width: 220, height: 10, background: '#0f1a2e',
+                        borderRadius: 5, overflow: 'hidden', border: '1px solid #2563eb',
                     }}>
                         <div style={{
-                            height: '100%',
-                            width: `${loadPct}%`,
+                            height: '100%', width: `${loadPct}%`,
                             background: 'linear-gradient(90deg, #2563eb, #7B2FBE)',
-                            borderRadius: 5,
-                            transition: 'width 0.2s ease',
+                            borderRadius: 5, transition: 'width 0.2s ease',
                         }} />
                     </div>
                     <div style={{ color: '#94a3b8', fontSize: 13 }}>{loadPct}%</div>
@@ -264,12 +257,7 @@ const QuestMapCanvas = ({ virtualInput, enterSignal }) => {
             )}
             <div
                 ref={containerRef}
-                style={{
-                    width: '100%',
-                    height: '100%',
-                    lineHeight: 0,
-                    imageRendering: 'pixelated',
-                }}
+                style={{ width: '100%', height: '100%', lineHeight: 0, imageRendering: 'pixelated' }}
             />
         </div>
     );
