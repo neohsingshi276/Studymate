@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import PhaserGame from '../components/PhaserGame'
 import api from '../utils/api'
@@ -9,6 +10,7 @@ const MAX_HP = 100
 
 export default function BossBattle() {
     const { updateUser } = useAuth()
+    const navigate = useNavigate()
     const [phase, setPhase] = useState('select') // select | loading | battle | result
     const [subjects, setSubjects] = useState([])
     const [subject, setSubject] = useState('')
@@ -124,6 +126,12 @@ export default function BossBattle() {
             })
             setBattleResult(res.data)
             updateUser({ xp: res.data.totals.xp, coins: res.data.totals.coins, badges: res.data.totals.badges })
+
+            // This boss battle is Checkpoint 1 of the Side Quest map — mark it
+            // complete so the quest map shows it as done and CP2/3 can unlock later.
+            if (won) {
+                api.post('/quest/checkpoint/1/complete').catch(() => { })
+            }
         } catch {
             setBattleResult({ error: true })
         }
@@ -303,12 +311,22 @@ export default function BossBattle() {
                                 </div>
                             </div>
                         )}
-                        <button
-                            onClick={() => setPhase('select')}
-                            className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:opacity-90 text-white font-bold px-8 py-3 rounded-xl transition-all"
-                        >
-                            ⚔️ Battle Again
-                        </button>
+                        <div className="flex justify-center gap-4 flex-wrap">
+                            <button
+                                onClick={() => setPhase('select')}
+                                className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:opacity-90 text-white font-bold px-8 py-3 rounded-xl transition-all"
+                            >
+                                ⚔️ Battle Again
+                            </button>
+                            {battleResult.result.won && (
+                                <button
+                                    onClick={() => navigate('/quest/map')}
+                                    className="bg-white/10 hover:bg-white/20 text-white font-bold px-8 py-3 rounded-xl transition-all"
+                                >
+                                    🗺️ Return to Quest Map
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
 

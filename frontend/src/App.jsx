@@ -12,6 +12,7 @@ import Pomodoro from './pages/Pomodoro'
 import AIAssistant from './pages/AIAssistant'
 import BossBattle from './pages/BossBattle'
 import Quest from './pages/Quest'
+import QuestMap from './pages/QuestMap'
 import NotesMarketplace from './pages/NotesMarketplace'
 import Friends from './pages/Friends'
 import Chat from './pages/Chat'
@@ -38,6 +39,7 @@ function App() {
       <Route path="/weekly-report" element={<ProtectedRoute><WeeklyReport /></ProtectedRoute>} />
       <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
       <Route path="/quest" element={<ProtectedRoute><Quest /></ProtectedRoute>} />
+      <Route path="/quest/map" element={<ProtectedRoute><QuestMap /></ProtectedRoute>} />
       <Route path="/game" element={<ProtectedRoute><BossBattle /></ProtectedRoute>} />
       <Route path="/notes" element={<ProtectedRoute><NotesMarketplace /></ProtectedRoute>} />
       <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />

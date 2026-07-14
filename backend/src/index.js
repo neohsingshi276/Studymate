@@ -19,6 +19,7 @@ const assistantRoutes = require('./routes/assistant_route');
 const battleRoutes = require('./routes/battle');
 const noteRoutes = require('./routes/notes');
 const friendRoutes = require('./routes/friends');
+const questRoutes = require('./routes/quest');
 const app = express();
 const server = http.createServer(app);
 
@@ -41,6 +42,7 @@ app.use('/api/assistant', assistantRoutes);
 app.use('/api/battle', battleRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/friends', friendRoutes);
+app.use('/api/quest', questRoutes);
 app.get('/', (req, res) => {
     res.json({ message: 'StudyMate API is running!' });
 });
